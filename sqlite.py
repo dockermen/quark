@@ -1,7 +1,5 @@
 import sqlite3
 
-import sqlite3
-
 
 def fetch_files(file_name):
     """检索文件,如果已存在那么返回False"""
