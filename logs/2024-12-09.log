@@ -1,0 +1,4 @@
+INFO save_task_id 2024/12/09 02:22:11 PM 获取保存文件的TASKID
+INFO save_task_id 2024/12/09 02:22:11 PM {'status': 200, 'code': 0, 'message': 'ok', 'timestamp': 1733725331, 'data': {'task_id': 'ba1c2c3ffcba47e6a86b35fa688934bd'}, 'metadata': {'tq_gap': 500}}
+INFO task 2024/12/09 02:22:11 PM 根据TASKID执行任务
+INFO task 2024/12/09 02:22:11 PM {'status': 400, 'code': 32003, 'message': 'capacity limit[{0}]', 'timestamp': 1733725331, 'data': {'event_id': '99ktjs-248480f1d76329', 'finished_at': '2024-12-09T14:22:11.630+0800', 'save_as': {'to_pdir_fid': 'ddc51a5bfb7c4ce69e7143f471b5cb51', 'save_as_sum_num': 58, 'is_pack': '0', 'save_as_top_fids': [], 'save_as_select_top_fids': [], 'to_pdir_name': '影视'}, 'task_title': '分享-转存', 'created_at': '2024-12-09T14:22:11.403+0800', 'task_id': 'ba1c2c3ffcba47e6a86b35fa688934bd', 'share': {}, 'task_type': 17, 'status': 3}, 'metadata': {'tq_gap': 500}}

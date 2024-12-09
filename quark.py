@@ -4,9 +4,11 @@ import time
 import random
 import logging
 import pandas as pd
-import sys
 import os,datetime
 from urllib import parse
+
+from sqlite import insert_files
+from sqlite import fetch_files
 
 if not os.path.exists("logs"):
 	os.mkdir("logs")
@@ -22,24 +24,24 @@ log.setLevel(logging.INFO)
 log.addHandler(file_handler)
 
 
-def get_id_from_url(url) -> str:
-    """pwd_id"""
+def get_id_from_url(url):
     pattern = r"/s/(\w+)"
     match = re.search(pattern, url)
     if match:
         return match.group(1)
-    return ""
+    return None
 
+
+    
 
 def generate_timestamp(length):
     timestamps = str(time.time() * 1000)
     return int(timestamps[0:length])
 
-
 class Quark:
     ad_pwd_id = "92e708f45ca6"
 
-    def __init__(self, cookie: str) -> None:
+    def __init__(self, cookie: str):
         self.headers = {
             'sec-ch-ua': '"Not_A Brand";v="8", "Chromium";v="120", "Google Chrome";v="120"',
             'accept': 'application/json, text/plain, */*',
@@ -61,28 +63,40 @@ class Quark:
         
         stoken = self.get_stoken(pwd_id)
         
-        print(stoken,pwd_id)
+        #print(stoken,pwd_id)
         detail = self.detail(pwd_id, stoken)
 
         file_name = detail.get('title')
-        from sqlite import fetch_files
         if fetch_files(file_name):
             first_id, share_fid_token, file_type = detail.get("fid"), detail.get("share_fid_token"), detail.get(
                 "file_type")
             task = self.save_task_id(pwd_id, stoken, first_id, share_fid_token)
             data = self.task(task)
+            print(task,data)
+            #print(data.get("data").get("save_as"))
             file_id = data.get("data").get("save_as").get("save_as_top_fids")[0]
+
             if not file_type:
                 dir_file_list = self.get_dir_file(file_id)
                 self.del_ad_file(dir_file_list)
                 #self.add_ad(file_id)
             share_task_id = self.share_task_id(file_id, file_name)
-            share_id = self.task(share_task_id).get("data").get("share_id")
-            share_link = self.get_share_link(share_id)
-            from sqlite import insert_files
-            #print("-------------------------------------------------")
-            print(file_id, file_name, file_type, share_link)
-            insert_files(file_id, file_name, file_type, share_link)
+            retry = 0
+            while retry < 5:
+                try:
+                    share_id = self.task(share_task_id).get("data").get("share_id")
+                    share_link = self.get_share_link(share_id)
+                    print("-------------------------------------------------")
+                    print(file_id, file_name, file_type, share_link)
+                    insert_files(file_id, file_name, file_type, share_link)
+                    break
+                except Exception as e:
+                    print("--------ERROR----------")
+                    print(url,share_task_id,self.task(share_task_id),e)
+                    time.sleep(3)
+                    continue
+                finally:
+                    retry+=1
 
     def get_stoken(self, pwd_id: str):
         url = f"https://drive-pc.quark.cn/1/clouddrive/share/sharepage/token?pr=ucpro&fr=pc&uc_param_str=&__dt=405&__t={generate_timestamp(13)}"
@@ -109,17 +123,28 @@ class Quark:
             "_page": 1,
             "_size": "50",
         }
-        response = requests.request("GET", url=url, headers=headers, params=parse.urlencode(params))
-        id_list = response.json().get("data").get("list")[0]
-        if id_list:
-            data = {
-                "title": id_list.get("file_name"),
-                "file_type": id_list.get("file_type"),
-                "fid": id_list.get("fid"),
-                "pdir_fid": id_list.get("pdir_fid"),
-                "share_fid_token": id_list.get("share_fid_token")
-            }
-            return data
+
+        retry = 0
+        while retry < 1:
+            try:
+                response = requests.request("GET", url=url, headers=headers, params=parse.urlencode(params))
+                id_list = response.json().get("data").get("list")
+                if id_list:
+                    id_list = id_list[0]
+                    data = {
+                    "title": id_list.get("file_name"),
+                    "file_type": id_list.get("file_type"),
+                    "fid": id_list.get("fid"),
+                    "pdir_fid": id_list.get("pdir_fid"),
+                    "share_fid_token": id_list.get("share_fid_token")
+                }
+                return data 
+            except Exception as e:
+                print(response.json().get("data"))
+            finally:
+                retry+=1
+
+
 
     def save_task_id(self, pwd_id, stoken, first_id, share_fid_token, to_pdir_fid="ddc51a5bfb7c4ce69e7143f471b5cb51"):
         log.info("获取保存文件的TASKID")
@@ -181,7 +206,7 @@ class Quark:
                 all_file.append(i)
         return all_file
 
-    def get_dir_file(self, dir_id) -> list:
+    def get_dir_file(self, dir_id):
         log.info("正在遍历父文件夹")
         """获取指定文件夹的文件,后期可能会递归"""
         url = f"https://drive-pc.quark.cn/1/clouddrive/file/sort?pr=ucpro&fr=pc&uc_param_str=&pdir_fid={dir_id}&_page=1&_size=50&_fetch_total=1&_fetch_sub_dirs=0&_sort=updated_at:desc"
@@ -231,7 +256,12 @@ if __name__ == '__main__':
     quark = Quark(cookie)
     df = pd.read_excel("./info.xlsx")
     df.columns = ["name","url","time"]
-    for url in df["url"][215:]:
-    # print(df["url"][135])
+    for url in df["url"][618:]:
         quark.store(url)
+    # a = quark.task("d22b9dcf661843629965b93a144542c9").get("data")
+    # print(a)
+    # share_task_id = quark.share_task_id("9630f4cb18fe4af2bfce3fb83eacae1c","02-登堂认母（60集）")
+    # share_id = quark.task(share_task_id).get("data").get("share_id")
+    # share_link = quark.get_share_link(share_id)
+    # insert_files("9630f4cb18fe4af2bfce3fb83eacae1c", "02-登堂认母（60集）", 0, share_link)
     
